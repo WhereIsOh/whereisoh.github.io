@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>mono.blog</title>
+  <title>WhereIsOh/Blogs</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -36,7 +36,43 @@
     ul a:hover { color: #fff; padding-left: 0.5rem; }
 
     h1 { font-size: 1.6rem; font-weight: 450; color: #f0f0f0; margin-bottom: 1.5rem; }
+    h2 { font-size: 1.15rem; font-weight: 450; color: #e8e8e8; margin: 2rem 0 0.8rem; }
+    h3 { font-size: 1rem; font-weight: 450; color: #dcdcdc; margin: 1.5rem 0 0.6rem; }
     p { color: #c0c0c0; margin-bottom: 1rem; }
+    ul.body-list { list-style: disc; padding-left: 1.5rem; margin-bottom: 1rem; }
+    ul.body-list li { margin-bottom: 0.4rem; color: #c0c0c0; }
+    ol.body-list { list-style: decimal; padding-left: 1.5rem; margin-bottom: 1rem; }
+    ol.body-list li { margin-bottom: 0.4rem; color: #c0c0c0; }
+    li { color: #c0c0c0; }
+
+    pre {
+      background: #222;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      padding: 0.8rem 1rem;
+      overflow-x: auto;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+    }
+    code {
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+      color: #d8d8d8;
+    }
+    p code, li code {
+      background: #222;
+      padding: 0.1rem 0.35rem;
+      border-radius: 3px;
+      font-size: 0.9em;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid #4a4a4a;
+      margin: 2rem 0;
+    }
+
+    em { color: #b0b0b0; }
+    strong { color: #e8e8e8; font-weight: 500; }
 
     .back {
       display: inline-block;
@@ -55,44 +91,139 @@
   <script>
     const posts = [
       {
+        id: 'killing-the-gui',
+        title: 'killing the GUI to free my resources',
+        body: `
+          <p>I was running a heavy program, and every drop of CPU mattered. The GUI was sitting there, quietly sipping resources I needed. So I did what any impatient person does — I turned it off. Here's what I learned, including the black screen that briefly convinced me I'd broken my machine.</p>
+
+          <p><strong>Note:</strong> Everything below is for Linux.</p>
+
+          <hr>
+
+          <h2>Step 1: See What's Eating Your Resources</h2>
+          <p>Before blaming the GUI, look at the real culprits.</p>
+<pre><code># Top 10 processes by CPU usage
+ps aux --sort=-%cpu | head
+
+# Top 10 processes by memory usage
+ps aux --sort=-%mem | head</code></pre>
+
+          <h2>Step 2: Is the GUI Even Running?</h2>
+          <p>Don't guess — just ask systemd.</p>
+<pre><code>systemctl status display-manager</code></pre>
+          <p>If it says <code>Active: active (running)</code>, the display manager is alive and well. If you see <code>inactive</code> or <code>failed</code>, there's nothing to kill.</p>
+
+          <h2>Step 3: Shut Down the GUI, Go Pure CLI</h2>
+
+          <h3>3.1 Switch to a Pure CLI TTY</h3>
+          <p>From your desktop, press <strong>Ctrl + Alt + F3</strong> (or F4, F5, F6). You'll land on a full-screen text login prompt. Log in with your username and password.</p>
+
+          <h3>3.2 Find Out Which Display Manager You're Running</h3>
+          <p><strong>Way 1:</strong></p>
+<pre><code>systemctl status display-manager</code></pre>
+          <p>Look at the first line of the output. It names the active service — something like <code>lightdm.service</code> or <code>sddm.service</code>.</p>
+
+          <p><strong>Way 2:</strong></p>
+<pre><code>cat /etc/X11/default-display-manager</code></pre>
+          <p>This shows the full path, like <code>/usr/sbin/lightdm</code>.</p>
+
+          <h3>3.3 Stop the GUI</h3>
+          <p>Now that you know the name (say, <code>gdm3</code>), plug it in:</p>
+<pre><code>sudo systemctl stop gdm3</code></pre>
+
+          <hr>
+
+          <h2>The Black Screen — And Why It Happens</h2>
+          <p>You run <code>sudo systemctl stop gdm3</code>… and the screen goes black. Panic sets in.</p>
+          <p><strong>The fix:</strong> Press <strong>Ctrl + Alt + F3</strong> to jump to a text TTY.</p>
+          <p>But <em>why</em> did the screen die in the first place?</p>
+
+          <h3>Why the Black Screen Appears</h3>
+          <p>When you run <code>sudo systemctl stop gdm3</code>, you're killing the very process that controls your current screen. You were typing that command inside a terminal that's part of the graphical session — or a TTY that GDM switched you to.</p>
+          <p>Here's the sequence:</p>
+          <ol class="body-list">
+            <li>You're in a GUI (or a terminal tied to the display manager).</li>
+            <li>You stop <code>gdm3</code>.</li>
+            <li>GDM dies → it can no longer draw anything on the screen.</li>
+            <li>The screen goes black because nothing is rendering anymore.</li>
+            <li>The system doesn't automatically switch you to a text TTY — it just leaves the framebuffer in a dead state.</li>
+          </ol>
+
+          <h3>Why Ctrl + Alt + F3 Saves You</h3>
+          <p><strong>Ctrl + Alt + F3</strong> switches to <strong>TTY3</strong>, a text console managed directly by the kernel, not by GDM. The kernel is still alive, so TTY3 works fine. That's why you can "return" to a CLI there — the graphical session is gone, but the console underneath never was.</p>
+
+          <h3>The Correct Order to Avoid the Black Screen</h3>
+          <p>Do this instead — switch to a TTY <em>first</em>, then stop the GUI:</p>
+          <ol class="body-list">
+            <li>Press <strong>Ctrl + Alt + F3</strong> → you're now in a text TTY (login prompt).</li>
+            <li>Log in with your username/password.</li>
+            <li>Now run:
+<pre><code>sudo systemctl stop gdm3</code></pre>
+            </li>
+            <li>The GUI on TTY1/TTY2 dies, but you stay on TTY3 — no black screen, because you're not on the graphical VT anymore.</li>
+          </ol>
+
+          <hr>
+
+          <h2>Bringing the GUI Back</h2>
+          <p>When your task is finished, start the display manager again:</p>
+<pre><code>sudo systemctl start gdm3</code></pre>
+          <p>Then press <strong>Ctrl + Alt + F1</strong> (or F2, or F7, depending on your system) to return to the graphical login screen.</p>
+
+          <hr>
+
+          <h2>Appendix: The Useless Part (But You Might Need It)</h2>
+
+          <h3>Returning to the GUI and Killing the Text TTY to Free Resources</h3>
+          <p>Honestly, is this really necessary? Probably not. But if you insist:</p>
+<pre><code># Run this from another terminal (e.g., your current F2 or a GUI terminal) — for tty3
+sudo systemctl stop getty@tty3.service</code></pre>
+
+          <h3>Restarting the Text TTY</h3>
+<pre><code>sudo systemctl start getty@tty3.service</code></pre>
+
+          <hr>
+
+          <p><strong>Final thought:</strong> Killing the GUI is a small act of rebellion against wasted resources. Just remember the order — <strong>TTY first, then kill the GUI</strong>. Learn from my black screen, not your own.</p>
+        `
+      },
+    /* {
         id: 'absence-of-colour',
         title: 'the absence of colour',
-        body: [
-          'Working in black, white and grey doesn\'t mean the work is dull. It means every value earns its place.',
-          'Stripping away hue forces structure, contrast, and rhythm to carry the message.'
-        ]
+        body: `
+          <p>Working in black, white and grey doesn't mean the work is dull. It means every value earns its place.</p>
+          <p>Stripping away hue forces structure, contrast, and rhythm to carry the message.</p>
+        `
       },
       {
         id: 'quiet-interface',
         title: 'quiet interface',
-        body: [
-          'A blog should feel like a quiet room. No neon, no noise. Just text and the space between it.',
-          'When everything is monochrome, reading becomes the focus.'
-        ]
+        body: `
+          <p>A blog should feel like a quiet room. No neon, no noise. Just text and the space between it.</p>
+          <p>When everything is monochrome, reading becomes the focus.</p>
+        `
       },
       {
         id: 'notes-on-simplicity',
         title: 'notes on simplicity',
-        body: [
-          'Super simple means no hidden complexity. One file. No build tools. No dependencies.',
-          'Black background, white type, a few greys to separate what matters.'
-        ]
-      }
+        body: `
+          <p>Super simple means no hidden complexity. One file. No build tools. No dependencies.</p>
+          <p>Black background, white type, a few greys to separate what matters.</p>
+        `
+      }  */
     ];
 
     const app = document.getElementById('app');
     const params = new URLSearchParams(location.search);
     const id = params.get('id');
     const post = id ? posts.find(p => p.id === id) : null;
-
-    // Build the "back" URL using only the pathname (drops ?id=...)
     const homeUrl = location.pathname;
 
     if (post) {
       app.innerHTML = `
         <article>
           <h1>${post.title}</h1>
-          ${post.body.map(p => `<p>${p}</p>`).join('')}
+          ${post.body}
           <a class="back" href="${homeUrl}">← back</a>
         </article>`;
     } else if (id) {
@@ -104,10 +235,6 @@
         </ul>`;
     }
 
-    // Safety net: if the page loads with an ?id= that doesn't exist AND
-    // the user presses browser back, hash/query changes won't fire a reload
-    // by themselves — but a normal link click will. This covers the edge
-    // case where the browser restores a cached page with the old query.
     window.addEventListener('pageshow', (e) => {
       if (e.persisted) location.reload();
     });
